@@ -1,5 +1,9 @@
 opacity_hotkey:Vitrite for Ubuntu
 
+ctrl+shift+1~0:5%~95%
+
+ctrl+shift+-:复原
+
 快速开始
 
 1. 获取代码  
