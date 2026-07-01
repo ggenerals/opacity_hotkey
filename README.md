@@ -6,7 +6,10 @@ ctrl+shift+-:复原
 
 快速开始
 
-1. 获取代码  
+1. 获取代码
+
+下载 zip: [Link](https://github.com/ggenerals/opacity_hotkey/archive/refs/heads/main.zip)
+
 确保您拥有以下两个文件在同一目录下：
 ```
 opacity_hotkey.cpp (源码)
