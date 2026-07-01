@@ -4,10 +4,11 @@
  *
  * 快捷键：
  *   Ctrl+Shift+1  →  5% 不透明（几乎透明）
- *   Ctrl+Shift+2  →  15%
- *   ...依次 +10%
- *   Ctrl+Shift+0  →  95%
- *   Ctrl+Shift+-  →  100% 复原
+ *   Ctrl+Shift+2  →  10%
+ *   ...依次 +5%
+ *   Ctrl+Shift+9  →  50%
+ *   Ctrl+Shift+0  →  复原(100%)
+ *   Ctrl+Shift+-  →  当前透明度 -1%
  *
  * 编译：
  *   g++ -O2 -o opacity_hotkey opacity_hotkey.cpp \
@@ -33,7 +34,7 @@ static Window    root_window = None;
 
 struct KeyBind {
     KeyCode     keycode;
-    int         opacity_pct;   // -1 = 复原(100%)
+    int         opacity_pct;   // -1 = 复原(100%), -2 = 当前值-1%
     const char* label;
 };
 static std::vector<KeyBind> g_keybinds;
@@ -83,6 +84,27 @@ static Window get_active_window() {
     return win;
 }
 
+/// 获取窗口当前透明度（0~0xFFFFFFFF）
+static uint32_t get_opacity(Window win) {
+    Atom atom = XInternAtom(xdisplay, "_NET_WM_WINDOW_OPACITY", False);
+    Atom actual_type;
+    int  actual_format;
+    unsigned long nitems, bytes_after;
+    unsigned char* prop = nullptr;
+    uint32_t opacity = 0xFFFFFFFFu;  // 默认不透明
+
+    if (XGetWindowProperty(xdisplay, win, atom,
+                           0, 1, False, XA_CARDINAL,
+                           &actual_type, &actual_format,
+                           &nitems, &bytes_after, &prop) == Success
+        && prop && nitems > 0)
+    {
+        opacity = *reinterpret_cast<uint32_t*>(prop);
+        XFree(prop);
+    }
+    return opacity;
+}
+
 /// 设置 _NET_WM_WINDOW_OPACITY
 static void set_opacity(Window win, uint32_t opacity) {
     Atom atom = XInternAtom(xdisplay, "_NET_WM_WINDOW_OPACITY", False);
@@ -116,9 +138,17 @@ x11_filter(GdkXEvent* xevent, GdkEvent* /*gdk_event*/, gpointer /*data*/)
 
         uint32_t val;
         int pct;
-        if (kb.opacity_pct < 0) {          // 复原
+        if (kb.opacity_pct == -1) {          // 复原
             val = 0xFFFFFFFFu;
             pct = 100;
+        } else if (kb.opacity_pct == -2) {   // 当前值 -1%
+            uint32_t current = get_opacity(active);
+            uint32_t step = static_cast<uint32_t>(
+                static_cast<double>(0xFFFFFFFFu) * 0.01);  // 1% 对应的值
+            val = (current > step) ? (current - step) : 0;
+            // 计算实际百分比用于日志
+            pct = static_cast<int>(
+                static_cast<double>(val) / 0xFFFFFFFFu * 100.0);
         } else {
             // 百分比 → 32-bit 不透明度值
             val = static_cast<uint32_t>(
@@ -195,17 +225,17 @@ int main(int argc, char* argv[]) {
     // ── 定义快捷键 ──
     struct Def { KeySym sym; int pct; const char* label; };
     Def defs[] = {
-        { XK_1,     5, "Ctrl+Shift+1 →  5%" },
-        { XK_2,    15, "Ctrl+Shift+2 → 15%" },
-        { XK_3,    25, "Ctrl+Shift+3 → 25%" },
-        { XK_4,    35, "Ctrl+Shift+4 → 35%" },
-        { XK_5,    45, "Ctrl+Shift+5 → 45%" },
-        { XK_6,    55, "Ctrl+Shift+6 → 55%" },
-        { XK_7,    65, "Ctrl+Shift+7 → 65%" },
-        { XK_8,    75, "Ctrl+Shift+8 → 75%" },
-        { XK_9,    85, "Ctrl+Shift+9 → 85%" },
-        { XK_0,    95, "Ctrl+Shift+0 → 95%" },
-        { XK_minus,-1, "Ctrl+Shift+- → 复原(100%)" },
+        { XK_1,      5, "Ctrl+Shift+1 →  5%" },
+        { XK_2,     10, "Ctrl+Shift+2 → 10%" },
+        { XK_3,     20, "Ctrl+Shift+3 → 20%" },
+        { XK_4,     25, "Ctrl+Shift+4 → 25%" },
+        { XK_5,     30, "Ctrl+Shift+5 → 30%" },
+        { XK_6,     35, "Ctrl+Shift+6 → 35%" },
+        { XK_7,     40, "Ctrl+Shift+7 → 40%" },
+        { XK_8,     45, "Ctrl+Shift+8 → 45%" },
+        { XK_9,     50, "Ctrl+Shift+9 → 50%" },
+        { XK_0,     -1, "Ctrl+Shift+0 → 复原(100%)" },
+        { XK_minus, -2, "Ctrl+Shift+- → 当前透明度-1%" },
     };
 
     const unsigned int base = ControlMask | ShiftMask;
@@ -228,8 +258,9 @@ int main(int argc, char* argv[]) {
     gtk_status_icon_set_title(tray, "窗口透明度管理器");
     gtk_status_icon_set_tooltip_text(tray,
         "窗口透明度管理器\n"
-        "Ctrl+Shift+1~0 : 设置透明度 (5%~95%)\n"
-        "Ctrl+Shift+-   : 复原 (100%)");
+        "Ctrl+Shift+1~9 : 设置透明度 (5%~50%)\n"
+        "Ctrl+Shift+0   : 复原 (100%)\n"
+        "Ctrl+Shift+-   : 当前透明度-1%");
     gtk_status_icon_set_visible(tray, TRUE);
 
     g_signal_connect(tray, "activate",
