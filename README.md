@@ -1,8 +1,12 @@
 opacity_hotkey:Vitrite for Ubuntu
 
-ctrl+shift+1~0:5%~95%
+```
+ctrl+shift+1~9:5%~50%
 
-ctrl+shift+-:复原
+ctrl+shift+0:复原
+
+ctrl+shift+-:将当前透明度减小 1%
+```
 
 快速开始
 
